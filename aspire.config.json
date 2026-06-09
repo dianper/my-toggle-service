@@ -1,0 +1,6 @@
+{
+  "appHost": {
+    "path": "MyToggleService.AppHost/MyToggleService.AppHost.csproj"
+  },
+  "channel": "stable"
+}
