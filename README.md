@@ -39,13 +39,22 @@ Lightweight centralized feature toggle service.
 
 3. Open the dashboard URL printed in terminal and launch `webfrontend`.
 
-## Data Model (MVP)
+## Data Model
+
+Applications are now a first-class registry:
+
+- `applications`
+   - `id`
+   - `name` (unique)
+   - `description` nullable
+   - `createdAt`
+   - `updatedAt`
 
 Each row is one toggle rule:
 
 - `id`
 - `key`
-- `application`
+- `applicationId` (FK -> `applications.id`)
 - `tenantId` nullable
 - `isEnabled`
 - `createdAt`
@@ -76,13 +85,26 @@ Returns a valid Bearer token for local development.
 
 ## Main Endpoints
 
+Applications:
+
+- `GET /api/applications`
+- `POST /api/applications`
+- `DELETE /api/applications/{id}`
+
+Toggles:
+
 - `GET /api/toggles`
 - `POST /api/toggles`
 - `PUT /api/toggles/{id}`
 - `PATCH /api/toggles/{id}/enabled`
 - `DELETE /api/toggles/{id}`
+
+Evaluate:
+
 - `GET /api/evaluate/single`
 - `POST /api/evaluate/batch`
+
+Important: toggle/evaluate contracts use `applicationId` instead of free-text `application`.
 
 ## Frontend Notes
 
