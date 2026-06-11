@@ -43,6 +43,8 @@ export default function ListTogglesPage() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [toggles, setToggles] = useState<Toggle[]>([])
   const [applicationFilter, setApplicationFilter] = useState('')
+  const [tenantFilter, setTenantFilter] = useState('')
+  const [keyFilter, setKeyFilter] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingApplications, setIsLoadingApplications] = useState(true)
   const [isLoadingTenants, setIsLoadingTenants] = useState(true)
@@ -80,12 +82,42 @@ export default function ListTogglesPage() {
     [tenants],
   )
 
+  const filteredToggles = useMemo(() => {
+    const normalizedKeyFilter = keyFilter.trim().toLowerCase()
+
+    return toggles.filter((toggle) => {
+      if (tenantFilter === '__global__' && toggle.tenantId !== null) {
+        return false
+      }
+
+      if (tenantFilter !== '' && tenantFilter !== '__global__' && toggle.tenantId !== tenantFilter) {
+        return false
+      }
+
+      if (normalizedKeyFilter !== '' && !toggle.key.toLowerCase().includes(normalizedKeyFilter)) {
+        return false
+      }
+
+      return true
+    })
+  }, [toggles, tenantFilter, keyFilter])
+
+  const statusText = useMemo(() => {
+    if (status) {
+      return status
+    }
+
+    const hasLocalFilters = tenantFilter !== '' || keyFilter.trim() !== ''
+    const suffix = hasLocalFilters ? ` (filtered from ${toggles.length})` : ''
+    return `${filteredToggles.length} toggle${filteredToggles.length !== 1 ? 's' : ''}${suffix}`
+  }, [status, filteredToggles.length, toggles.length, tenantFilter, keyFilter])
+
   async function loadData() {
     setIsLoading(true)
     try {
       const data = await listToggles(applicationFilter || undefined)
       setToggles(data)
-      setStatus(`${data.length} toggle${data.length !== 1 ? 's' : ''}`)
+      setStatus('')
     } catch (error) {
       setStatus(`Failed to load toggles: ${(error as Error).message}`)
     } finally {
@@ -262,7 +294,7 @@ export default function ListTogglesPage() {
         <div>
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">Feature Toggles</h2>
           <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
-            {isLoading ? 'Loading…' : status}
+            {isLoading ? 'Loading…' : statusText}
           </p>
         </div>
         <button
@@ -275,7 +307,7 @@ export default function ListTogglesPage() {
         </button>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative">
           <select
             className="appearance-none rounded-lg border border-[var(--surface-border)] bg-[var(--surface-base)] py-2 pl-3 pr-8 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
@@ -293,6 +325,31 @@ export default function ListTogglesPage() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
           </div>
         </div>
+        <div className="relative">
+          <select
+            className="appearance-none rounded-lg border border-[var(--surface-border)] bg-[var(--surface-base)] py-2 pl-3 pr-8 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+            value={tenantFilter}
+            onChange={(e) => setTenantFilter(e.target.value)}
+            disabled={isLoadingTenants}
+          >
+            <option value="">All tenants</option>
+            <option value="__global__">Global only</option>
+            {tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.name}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[var(--text-tertiary)]">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </div>
+        <input
+          className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+          value={keyFilter}
+          onChange={(e) => setKeyFilter(e.target.value)}
+          placeholder="Filter by key"
+        />
         <button
           type="button"
           onClick={loadData}
@@ -302,7 +359,7 @@ export default function ListTogglesPage() {
           Refresh
         </button>
         {evaluation && (
-          <span className="ml-auto rounded-lg border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+          <span className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--text-secondary)] md:ml-auto">
             {evaluation}
           </span>
         )}
@@ -311,7 +368,7 @@ export default function ListTogglesPage() {
       <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] shadow-[var(--card-shadow)]">
         {isLoading ? (
           <div className="px-6 py-12 text-center text-sm text-[var(--text-secondary)]">Loading…</div>
-        ) : toggles.length === 0 ? (
+        ) : filteredToggles.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <p className="text-sm text-[var(--text-secondary)]">No toggles found.</p>
             <button
@@ -335,10 +392,10 @@ export default function ListTogglesPage() {
                 </tr>
               </thead>
               <tbody>
-                {toggles.map((toggle, i) => (
+                {filteredToggles.map((toggle, i) => (
                   <tr
                     key={toggle.id}
-                    className={`transition-colors hover:bg-[var(--surface-muted)] ${i < toggles.length - 1 ? 'border-b border-[var(--surface-border-soft)]' : ''}`}
+                    className={`transition-colors hover:bg-[var(--surface-muted)] ${i < filteredToggles.length - 1 ? 'border-b border-[var(--surface-border-soft)]' : ''}`}
                   >
                     <td className="px-6 py-3.5 font-semibold text-[var(--text-primary)]">{toggle.applicationName}</td>
                     <td className="px-6 py-3.5 font-mono text-xs text-[var(--text-secondary)]">{toggle.key}</td>

@@ -24,7 +24,6 @@ public sealed class MyToggleServiceClient : IMyToggleServiceClient
     }
 
     public async Task<EvaluateToggleResponse> EvaluateAsync(
-        Guid applicationId,
         string key,
         Guid? tenantId = null,
         CancellationToken cancellationToken = default)
@@ -36,7 +35,7 @@ public sealed class MyToggleServiceClient : IMyToggleServiceClient
 
         var path = BuildPathWithQuery(
             "/api/evaluate/single",
-            ("applicationId", applicationId.ToString()),
+            ("applicationId", _options.ApplicationId.ToString()),
             ("key", key),
             ("tenantId", tenantId?.ToString()));
 
@@ -54,14 +53,13 @@ public sealed class MyToggleServiceClient : IMyToggleServiceClient
     }
 
     public async Task<IReadOnlyList<EvaluateToggleResponse>> EvaluateBatchAsync(
-        Guid applicationId,
         IEnumerable<string> keys,
         Guid? tenantId = null,
         CancellationToken cancellationToken = default)
     {
         var requestModel = new
         {
-            applicationId,
+            applicationId = _options.ApplicationId,
             tenantId,
             keys = keys.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
         };
@@ -89,14 +87,13 @@ public sealed class MyToggleServiceClient : IMyToggleServiceClient
     }
 
     public async Task<IReadOnlyList<ToggleDto>> ListTogglesAsync(
-        Guid? applicationId = null,
         Guid? tenantId = null,
         bool includeGlobal = true,
         CancellationToken cancellationToken = default)
     {
         var path = BuildPathWithQuery(
             "/api/toggles",
-            ("applicationId", applicationId?.ToString()),
+            ("applicationId", _options.ApplicationId.ToString()),
             ("tenantId", tenantId?.ToString()),
             ("includeGlobal", includeGlobal.ToString(CultureInfo.InvariantCulture).ToLowerInvariant()));
 

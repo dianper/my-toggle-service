@@ -16,7 +16,27 @@ using MyToggleService.Client;
 builder.Services.AddMyToggleServiceClient(options =>
 {
     options.BaseAddress = new Uri("https://localhost:7591");
+    options.ApplicationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     options.BearerToken = "<token>";
+});
+```
+
+## DI Registration with Token Provider
+
+```csharp
+using MyToggleService.Client;
+
+builder.Services.AddMyToggleServiceClient(
+    options =>
+    {
+        options.BaseAddress = new Uri("https://localhost:7591");
+        options.ApplicationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    },
+    async cancellationToken =>
+    {
+        // Called for each request
+        return await tokenProvider.GetTokenAsync(cancellationToken);
+    });
 });
 ```
 
@@ -25,9 +45,17 @@ builder.Services.AddMyToggleServiceClient(options =>
 ```csharp
 using MyToggleService.Client;
 
-var response = await client.EvaluateAsync(applicationId, "checkout.new-flow", tenantId);
+var response = await client.EvaluateAsync("checkout.new-flow", tenantId);
 if (response.IsEnabled)
 {
     // feature enabled
 }
+
+var batch = await client.EvaluateBatchAsync(new[]
+{
+    "checkout.new-flow",
+    "billing.new-card"
+}, tenantId);
+
+var toggles = await client.ListTogglesAsync(tenantId, includeGlobal: true);
 ```

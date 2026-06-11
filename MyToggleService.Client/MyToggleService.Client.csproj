@@ -10,7 +10,10 @@
     <Company>MyToggleService</Company>
     <Description>Client SDK to evaluate feature toggles and list toggles from MyToggleService API.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RepositoryUrl>https://github.com/mytoggleservice/my-toggle-service</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dianper/my-toggle-service</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dianper/my-toggle-service</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Initial package release for MyToggleService client SDK.</PackageReleaseNotes>
     <PackageTags>feature-toggle;feature-flag;sdk;client</PackageTags>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
