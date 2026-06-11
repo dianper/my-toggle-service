@@ -7,6 +7,7 @@ public sealed class ToggleDbContext(DbContextOptions<ToggleDbContext> options) :
 {
     public DbSet<FeatureToggleEntity> FeatureToggles => Set<FeatureToggleEntity>();
     public DbSet<ApplicationEntity> Applications => Set<ApplicationEntity>();
+    public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,6 +25,21 @@ public sealed class ToggleDbContext(DbContextOptions<ToggleDbContext> options) :
         applications
             .HasIndex(x => x.Name)
             .HasDatabaseName("ux_applications_name")
+            .IsUnique();
+
+        var tenants = modelBuilder.Entity<TenantEntity>();
+
+        tenants.ToTable("tenants");
+        tenants.HasKey(x => x.Id);
+
+        tenants.Property(x => x.Id).HasColumnName("id");
+        tenants.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+        tenants.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+        tenants.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+        tenants
+            .HasIndex(x => x.Name)
+            .HasDatabaseName("ux_tenants_name")
             .IsUnique();
 
         var toggles = modelBuilder.Entity<FeatureToggleEntity>();
@@ -81,6 +97,19 @@ public sealed class ToggleDbContext(DbContextOptions<ToggleDbContext> options) :
             .Where(e => e.State is EntityState.Added or EntityState.Modified);
 
         foreach (var entry in applicationEntries)
+        {
+            entry.Entity.UpdatedAt = DateTimeOffset.UtcNow;
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.CreatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
+        var tenantEntries = ChangeTracker
+            .Entries<TenantEntity>()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified);
+
+        foreach (var entry in tenantEntries)
         {
             entry.Entity.UpdatedAt = DateTimeOffset.UtcNow;
             if (entry.State == EntityState.Added)

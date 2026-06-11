@@ -45,13 +45,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const currentUser = await getMe()
         if (currentUser) {
           setUser(currentUser)
-        } else {
-          // Not authenticated, redirect to login
-          window.location.href = '/login'
         }
       } catch (error) {
         console.error('Failed to get user:', error)
-        window.location.href = '/login'
       } finally {
         setIsInitialized(true)
       }

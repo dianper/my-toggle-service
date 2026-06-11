@@ -1,9 +1,15 @@
 import type {
   Application,
   CreateApplicationRequest,
+  CreateTenantRequest,
   CreateToggleRequest,
   EvaluateToggleResponse,
+  Tenant,
   Toggle,
+  UpdateApplicationRequest,
+  UpdateTenantRequest,
+  UpdateToggleGroupRequest,
+  UpdateToggleRequest,
   User,
 } from './types'
 
@@ -64,8 +70,40 @@ export async function createApplication(payload: CreateApplicationRequest): Prom
   })
 }
 
+export async function updateApplication(id: string, payload: UpdateApplicationRequest): Promise<Application> {
+  return request<Application>(`/api/applications/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function deleteApplication(id: string): Promise<void> {
   await request(`/api/applications/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+// Tenants
+export async function listTenants(): Promise<Tenant[]> {
+  return request<Tenant[]>('/api/tenants')
+}
+
+export async function createTenant(payload: CreateTenantRequest): Promise<Tenant> {
+  return request<Tenant>('/api/tenants', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateTenant(id: string, payload: UpdateTenantRequest): Promise<Tenant> {
+  return request<Tenant>(`/api/tenants/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteTenant(id: string): Promise<void> {
+  await request(`/api/tenants/${id}`, {
     method: 'DELETE',
   })
 }
@@ -88,9 +126,16 @@ export async function createToggle(payload: CreateToggleRequest): Promise<void> 
 
 export async function updateToggle(
   id: string,
-  payload: CreateToggleRequest,
+  payload: UpdateToggleRequest,
 ): Promise<void> {
   await request(`/api/toggles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateToggleGroup(payload: UpdateToggleGroupRequest): Promise<Toggle[]> {
+  return request<Toggle[]>('/api/toggles/groups', {
     method: 'PUT',
     body: JSON.stringify(payload),
   })

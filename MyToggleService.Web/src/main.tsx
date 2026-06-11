@@ -1,15 +1,23 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { RouterProvider, createBrowserRouter, Navigate } from 'react-router-dom'
+import { RouterProvider, createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import './index.css'
 import { AppProvider, useAppContext } from './context/AppContext'
 import MainLayout from './layouts/MainLayout'
 import ApplicationsPage from './pages/Applications/ApplicationsPage'
 import ListTogglesPage from './pages/Toggles/List/ListTogglesPage'
 import LoginPage from './pages/Login/LoginPage'
+import TenantsPage from './pages/Tenants/TenantsPage'
 
-// Protected route component
-function ProtectedRoute({ element }: { element: React.ReactNode }) {
+function AppRootLayout() {
+  return (
+    <AppProvider>
+      <Outlet />
+    </AppProvider>
+  )
+}
+
+function ProtectedLayout() {
   const { isAuthenticated, isInitialized } = useAppContext()
 
   if (!isInitialized) {
@@ -20,33 +28,52 @@ function ProtectedRoute({ element }: { element: React.ReactNode }) {
     return <Navigate to="/login" replace />
   }
 
-  return element
+  return <MainLayout />
+}
+
+function LoginRoute() {
+  const { isAuthenticated, isInitialized } = useAppContext()
+
+  if (!isInitialized) {
+    return <div>Carregando...</div>
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
+
+  return <LoginPage />
 }
 
 const router = createBrowserRouter([
   {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  {
-    path: '/',
-    element: (
-      <AppProvider>
-        <MainLayout />
-      </AppProvider>
-    ),
+    element: <AppRootLayout />,
     children: [
       {
-        index: true,
-        element: <ApplicationsPage />,
+        path: '/login',
+        element: <LoginRoute />,
       },
       {
-        path: 'applications',
-        element: <ApplicationsPage />,
-      },
-      {
-        path: 'toggles',
-        element: <ListTogglesPage />,
+        path: '/',
+        element: <ProtectedLayout />,
+        children: [
+          {
+            index: true,
+            element: <ApplicationsPage />,
+          },
+          {
+            path: 'applications',
+            element: <ApplicationsPage />,
+          },
+          {
+            path: 'toggles',
+            element: <ListTogglesPage />,
+          },
+          {
+            path: 'tenants',
+            element: <TenantsPage />,
+          },
+        ],
       },
     ],
   },

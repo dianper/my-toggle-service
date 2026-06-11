@@ -21,19 +21,19 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-container">
         <div className="login-card">
-          <h1>Toggle Service</h1>
-          <p className="login-subtitle">Gerenciador de Feature Toggles</p>
+          <h1>Fortytwo Toggle Service</h1>
+          <p className="login-subtitle">Feature Toggle Management</p>
 
           {errorParam || error ? (
             <div className="error-message">
-              <p>Falha na autenticação. Tente novamente.</p>
+              <p>Authentication failed. Please try again.</p>
               <code>{errorParam || error}</code>
             </div>
           ) : null}
 
           <div className="login-content">
             <p className="login-description">
-              Entre com sua conta corporativa para acessar o serviço
+              Sign in with your corporate account to access the service
             </p>
 
             <button
@@ -44,7 +44,7 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <span className="spinner"></span>
-                  Redirecionando...
+                  Redirecting...
                 </>
               ) : (
                 <>
@@ -55,14 +55,14 @@ export default function LoginPage() {
                   >
                     <path d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zm12.6 0H12.6V0H24v11.4z" />
                   </svg>
-                  Login com Microsoft
+                  Sign in with Microsoft
                 </>
               )}
             </button>
           </div>
 
           <footer className="login-footer">
-            <p>Apenas contas @labs.fortytwo.io são permitidas</p>
+            <p>Only @labs.fortytwo.io accounts are allowed</p>
           </footer>
         </div>
       </div>

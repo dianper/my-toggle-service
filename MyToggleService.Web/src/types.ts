@@ -1,3 +1,23 @@
+export type Tenant = {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+export type UpdateToggleGroupRequest = {
+  key: string
+  applicationId: string
+  isEnabled: boolean
+  tenantIds: string[] | null
+}
+export type CreateTenantRequest = {
+  id: string
+  name: string
+}
+
+export type UpdateTenantRequest = {
+  name: string
+}
 export type Application = {
   id: string
   name: string
@@ -27,6 +47,18 @@ export type CreateToggleRequest = {
 export type CreateApplicationRequest = {
   name: string
   description: string | null
+}
+
+export type UpdateApplicationRequest = {
+  name: string
+  description: string | null
+}
+
+export type UpdateToggleRequest = {
+  key: string
+  applicationId: string
+  tenantId: string | null
+  isEnabled: boolean
 }
 
 export type EvaluateToggleResponse = {

@@ -12,6 +12,12 @@ public sealed record UpdateToggleRequest(
     Guid? TenantId,
     bool IsEnabled);
 
+public sealed record UpdateToggleGroupRequest(
+    string Key,
+    Guid ApplicationId,
+    bool IsEnabled,
+    List<Guid>? TenantIds);
+
 public sealed record SetToggleEnabledRequest(bool IsEnabled);
 
 public sealed record EvaluateToggleBatchRequest(
@@ -40,9 +46,23 @@ public sealed record CreateApplicationRequest(
     string Name,
     string? Description);
 
+public sealed record UpdateApplicationRequest(
+    string Name,
+    string? Description);
+
 public sealed record ApplicationDto(
     Guid Id,
     string Name,
     string? Description,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+public sealed record CreateTenantRequest(Guid Id, string Name);
+
+public sealed record UpdateTenantRequest(string Name);
+
+public sealed record TenantDto(
+    Guid Id,
+    string Name,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

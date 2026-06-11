@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { createApplication, deleteApplication, listApplications, updateApplication } from '../../api'
-import type { Application } from '../../types'
+import { createTenant, deleteTenant, listTenants, updateTenant } from '../../api'
+import type { Tenant } from '../../types'
 
 function PlusIcon() {
   return (
@@ -18,34 +18,30 @@ function CloseIcon() {
   )
 }
 
-export default function ApplicationsPage() {
-  const [applications, setApplications] = useState<Application[]>([])
+export default function TenantsPage() {
+  const [tenants, setTenants] = useState<Tenant[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [tenantId, setTenantId] = useState('')
   const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Edit modal
-  const [editTarget, setEditTarget] = useState<Application | null>(null)
+  const [editTarget, setEditTarget] = useState<Tenant | null>(null)
   const [editName, setEditName] = useState('')
-  const [editDescription, setEditDescription] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editError, setEditError] = useState('')
 
-  // Delete modal
-  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
   async function load() {
     setIsLoading(true)
     try {
-      const data = await listApplications()
-      setApplications(data)
+      const data = await listTenants()
+      setTenants(data)
     } finally {
       setIsLoading(false)
     }
@@ -56,21 +52,22 @@ export default function ApplicationsPage() {
   }, [])
 
   function openCreateModal() {
+    setTenantId('')
     setName('')
-    setDescription('')
     setError('')
     setShowCreateModal(true)
   }
 
   async function handleCreate() {
+    const trimmedId = tenantId.trim()
     const trimmed = name.trim()
-    if (!trimmed) return
+    if (!trimmedId || !trimmed) return
 
     setIsSaving(true)
     setError('')
     try {
-      const created = await createApplication({ name: trimmed, description: description.trim() || null })
-      setApplications((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+      const created = await createTenant({ id: trimmedId, name: trimmed })
+      setTenants((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
       setShowCreateModal(false)
     } catch (err) {
       setError((err as Error).message)
@@ -79,25 +76,20 @@ export default function ApplicationsPage() {
     }
   }
 
-  function openEditModal(app: Application) {
-    setEditTarget(app)
-    setEditName(app.name)
-    setEditDescription(app.description ?? '')
+  function openEditModal(tenant: Tenant) {
+    setEditTarget(tenant)
+    setEditName(tenant.name)
     setEditError('')
   }
 
   async function handleEdit() {
     if (!editTarget || !editName.trim()) return
+
     setIsEditing(true)
     setEditError('')
     try {
-      const updated = await updateApplication(editTarget.id, {
-        name: editName.trim(),
-        description: editDescription.trim() || null,
-      })
-      setApplications((prev) =>
-        prev.map((a) => (a.id === updated.id ? updated : a)).sort((a, b) => a.name.localeCompare(b.name)),
-      )
+      const updated = await updateTenant(editTarget.id, { name: editName.trim() })
+      setTenants((prev) => prev.map((item) => (item.id === updated.id ? updated : item)).sort((a, b) => a.name.localeCompare(b.name)))
       setEditTarget(null)
     } catch (err) {
       setEditError((err as Error).message)
@@ -106,18 +98,19 @@ export default function ApplicationsPage() {
     }
   }
 
-  function openDeleteModal(app: Application) {
-    setDeleteTarget(app)
+  function openDeleteModal(tenant: Tenant) {
+    setDeleteTarget(tenant)
     setDeleteError('')
   }
 
   async function handleDelete() {
     if (!deleteTarget) return
+
     setIsDeleting(true)
     setDeleteError('')
     try {
-      await deleteApplication(deleteTarget.id)
-      setApplications((prev) => prev.filter((a) => a.id !== deleteTarget.id))
+      await deleteTenant(deleteTarget.id)
+      setTenants((prev) => prev.filter((item) => item.id !== deleteTarget.id))
       setDeleteTarget(null)
     } catch (err) {
       setDeleteError((err as Error).message)
@@ -128,12 +121,11 @@ export default function ApplicationsPage() {
 
   return (
     <>
-      {/* Page header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">Applications</h2>
+          <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">Tenants</h2>
           <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
-            {isLoading ? 'Loading…' : `${applications.length} registered application${applications.length !== 1 ? 's' : ''}`}
+            {isLoading ? 'Loading…' : `${tenants.length} registered tenant${tenants.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <button
@@ -142,23 +134,22 @@ export default function ApplicationsPage() {
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-[var(--accent-contrast)] transition hover:brightness-110"
         >
           <PlusIcon />
-          New Application
+          New Tenant
         </button>
       </div>
 
-      {/* Table */}
       <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] shadow-[var(--card-shadow)]">
         {isLoading ? (
           <div className="px-6 py-12 text-center text-sm text-[var(--text-secondary)]">Loading…</div>
-        ) : applications.length === 0 ? (
+        ) : tenants.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <p className="text-sm text-[var(--text-secondary)]">No applications registered yet.</p>
+            <p className="text-sm text-[var(--text-secondary)]">No tenants registered yet.</p>
             <button
               type="button"
               onClick={openCreateModal}
               className="mt-3 text-sm font-semibold text-[var(--accent)] hover:underline"
             >
-              Register your first application →
+              Create your first tenant →
             </button>
           </div>
         ) : (
@@ -166,34 +157,30 @@ export default function ApplicationsPage() {
             <thead>
               <tr className="border-b border-[var(--surface-border)] text-left text-xs uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
                 <th className="px-6 py-3 font-semibold">Name</th>
-                <th className="px-6 py-3 font-semibold">Description</th>
                 <th className="px-6 py-3 font-semibold">ID</th>
                 <th className="px-6 py-3 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {applications.map((app, i) => (
+              {tenants.map((tenant, i) => (
                 <tr
-                  key={app.id}
-                  className={`transition-colors hover:bg-[var(--surface-muted)] ${i < applications.length - 1 ? 'border-b border-[var(--surface-border-soft)]' : ''}`}
+                  key={tenant.id}
+                  className={`transition-colors hover:bg-[var(--surface-muted)] ${i < tenants.length - 1 ? 'border-b border-[var(--surface-border-soft)]' : ''}`}
                 >
-                  <td className="px-6 py-3.5 font-semibold text-[var(--text-primary)]">{app.name}</td>
-                  <td className="px-6 py-3.5 text-[var(--text-secondary)]">
-                    {app.description ?? <span className="italic text-[var(--text-tertiary)]">—</span>}
-                  </td>
-                  <td className="px-6 py-3.5 font-mono text-xs text-[var(--text-tertiary)]">{app.id}</td>
+                  <td className="px-6 py-3.5 font-semibold text-[var(--text-primary)]">{tenant.name}</td>
+                  <td className="px-6 py-3.5 font-mono text-xs text-[var(--text-tertiary)]">{tenant.id}</td>
                   <td className="px-6 py-3.5">
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => openEditModal(app)}
+                        onClick={() => openEditModal(tenant)}
                         className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)]"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
-                        onClick={() => openDeleteModal(app)}
+                        onClick={() => openDeleteModal(tenant)}
                         className="rounded-lg border border-[var(--danger-text)]/30 bg-[var(--danger-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--danger-text)] transition hover:brightness-95"
                       >
                         Delete
@@ -207,15 +194,14 @@ export default function ApplicationsPage() {
         )}
       </div>
 
-      {/* New Application Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
           <div className="relative w-full max-w-md rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] p-6 shadow-[var(--panel-shadow)]">
             <div className="mb-5 flex items-start justify-between">
               <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">New Application</h3>
-                <p className="mt-0.5 text-sm text-[var(--text-secondary)]">Register a new application to manage its toggles.</p>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">New Tenant</h3>
+                <p className="mt-0.5 text-sm text-[var(--text-secondary)]">Register a tenant for toggle targeting.</p>
               </div>
               <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-lg p-1 text-[var(--text-tertiary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]">
                 <CloseIcon />
@@ -223,17 +209,29 @@ export default function ApplicationsPage() {
             </div>
             <div className="space-y-4">
               <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                Name <span className="text-[var(--danger-text)]">*</span>
-                <input autoFocus className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()} placeholder="service-a" />
+                Tenant ID <span className="text-[var(--danger-text)]">*</span>
+                <input
+                  autoFocus
+                  className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+                  value={tenantId}
+                  onChange={(e) => setTenantId(e.target.value)}
+                  placeholder="00000000-0000-0000-0000-000000000000"
+                />
               </label>
               <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                Description
-                <input className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]" value={description} onChange={(e) => setDescription(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()} placeholder="Short description (optional)" />
+                Name <span className="text-[var(--danger-text)]">*</span>
+                <input
+                  className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  placeholder="tenant-acme"
+                />
               </label>
               {error && <p className="text-xs text-[var(--danger-text)]">{error}</p>}
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-lg border border-[var(--surface-border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)]">Cancel</button>
-                <button type="button" onClick={handleCreate} disabled={isSaving || !name.trim()} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-contrast)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={handleCreate} disabled={isSaving || !tenantId.trim() || !name.trim()} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-contrast)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
                   {isSaving ? 'Creating…' : 'Create'}
                 </button>
               </div>
@@ -242,15 +240,14 @@ export default function ApplicationsPage() {
         </div>
       )}
 
-      {/* Edit Application Modal */}
       {editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditTarget(null)} />
           <div className="relative w-full max-w-md rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] p-6 shadow-[var(--panel-shadow)]">
             <div className="mb-5 flex items-start justify-between">
               <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">Edit Application</h3>
-                <p className="mt-0.5 text-sm text-[var(--text-secondary)]">Update name or description.</p>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Edit Tenant</h3>
+                <p className="mt-0.5 text-sm text-[var(--text-secondary)]">Update tenant name.</p>
               </div>
               <button type="button" onClick={() => setEditTarget(null)} className="rounded-lg p-1 text-[var(--text-tertiary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]">
                 <CloseIcon />
@@ -259,11 +256,13 @@ export default function ApplicationsPage() {
             <div className="space-y-4">
               <label className="block text-sm font-medium text-[var(--text-secondary)]">
                 Name <span className="text-[var(--danger-text)]">*</span>
-                <input autoFocus className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]" value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleEdit()} />
-              </label>
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                Description
-                <input className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleEdit()} placeholder="Short description (optional)" />
+                <input
+                  autoFocus
+                  className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
+                />
               </label>
               {editError && <p className="text-xs text-[var(--danger-text)]">{editError}</p>}
               <div className="flex justify-end gap-2 pt-1">
@@ -277,14 +276,13 @@ export default function ApplicationsPage() {
         </div>
       )}
 
-      {/* Delete Application Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
           <div className="relative w-full max-w-sm rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] p-6 shadow-[var(--panel-shadow)]">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Delete Application</h3>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">Delete Tenant</h3>
             <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              Are you sure you want to delete <span className="font-semibold text-[var(--text-primary)]">{deleteTarget.name}</span>? This action cannot be undone.
+              Are you sure you want to delete tenant <span className="font-semibold text-[var(--text-primary)]">{deleteTarget.name}</span>? This action cannot be undone.
             </p>
             {deleteError && <p className="mt-3 text-xs text-[var(--danger-text)]">{deleteError}</p>}
             <div className="mt-5 flex justify-end gap-2">

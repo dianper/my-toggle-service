@@ -1,8 +1,7 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MyToggleService.ApiService.Services;
 
 namespace MyToggleService.ApiService.Controllers;
 
@@ -70,6 +69,8 @@ public class AuthController : ControllerBase
                 _logger.LogWarning("State validation failed");
                 return Redirect("/login?error=state_mismatch");
             }
+
+            HttpContext.Session.Remove("auth_state");
 
             // Exchange code for token
             var redirectUri = $"{Request.Scheme}://{Request.Host}/auth/callback";

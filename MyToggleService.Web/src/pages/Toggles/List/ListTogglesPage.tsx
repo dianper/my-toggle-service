@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listApplications, listToggles, setToggleEnabled, evaluateToggle, createToggle } from '../../../api'
-import type { Application, Toggle } from '../../../types'
+import {
+  createToggle,
+  deleteToggle,
+  evaluateToggle,
+  listApplications,
+  listTenants,
+  listToggles,
+  setToggleEnabled,
+  updateToggleGroup,
+} from '../../../api'
+import type { Application, Tenant, Toggle } from '../../../types'
 
 function PlusIcon() {
   return (
@@ -31,25 +40,44 @@ function RefreshIcon() {
 
 export default function ListTogglesPage() {
   const [applications, setApplications] = useState<Application[]>([])
+  const [tenants, setTenants] = useState<Tenant[]>([])
   const [toggles, setToggles] = useState<Toggle[]>([])
   const [applicationFilter, setApplicationFilter] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingApplications, setIsLoadingApplications] = useState(true)
+  const [isLoadingTenants, setIsLoadingTenants] = useState(true)
   const [evaluation, setEvaluation] = useState('')
   const [status, setStatus] = useState('')
 
-  // Create toggle modal state
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newApplicationId, setNewApplicationId] = useState('')
   const [newKey, setNewKey] = useState('')
-  const [newTenants, setNewTenants] = useState('')
+  const [newTenantIds, setNewTenantIds] = useState<string[]>([])
   const [newEnabled, setNewEnabled] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState('')
 
+  const [editTarget, setEditTarget] = useState<Toggle | null>(null)
+  const [editApplicationId, setEditApplicationId] = useState('')
+  const [editKey, setEditKey] = useState('')
+  const [editTenantIds, setEditTenantIds] = useState<string[]>([])
+  const [editEnabled, setEditEnabled] = useState(false)
+  const [editGroupHasMixedStates, setEditGroupHasMixedStates] = useState(false)
+  const [isEditSaving, setIsEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+
+  const [deleteTarget, setDeleteTarget] = useState<Toggle | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   const canCreate = useMemo(
     () => newApplicationId.trim() !== '' && newKey.trim() !== '',
     [newApplicationId, newKey],
+  )
+
+  const tenantNameById = useMemo(
+    () => new Map(tenants.map((tenant) => [tenant.id, tenant.name])),
+    [tenants],
   )
 
   async function loadData() {
@@ -77,10 +105,22 @@ export default function ListTogglesPage() {
     }
   }
 
+  async function loadTenants() {
+    setIsLoadingTenants(true)
+    try {
+      const data = await listTenants()
+      setTenants(data)
+    } catch (error) {
+      setStatus(`Failed to load tenants: ${(error as Error).message}`)
+    } finally {
+      setIsLoadingTenants(false)
+    }
+  }
+
   useEffect(() => {
     ;(async () => {
       try {
-        await loadApplications()
+        await Promise.all([loadApplications(), loadTenants()])
         await loadData()
       } catch (error) {
         setStatus(`Failed to initialize: ${(error as Error).message}`)
@@ -110,29 +150,93 @@ export default function ListTogglesPage() {
     try {
       const result = await evaluateToggle(toggle.applicationId, toggle.key, toggle.tenantId)
       setEvaluation(
-        `${toggle.applicationName}/${result.key} → enabled=${result.isEnabled} (${result.resolution})`,
+        `${toggle.applicationName}/${result.key} -> enabled=${result.isEnabled} (${result.resolution})`,
       )
     } catch (error) {
       setEvaluation(`Evaluation failed: ${(error as Error).message}`)
     }
   }
 
+  function toggleSelection(current: string[], id: string) {
+    if (current.includes(id)) {
+      return current.filter((item) => item !== id)
+    }
+
+    return [...current, id]
+  }
+
   function openCreateModal() {
     setNewKey('')
-    setNewTenants('')
+    setNewTenantIds([])
     setNewEnabled(false)
     setCreateError('')
     setNewApplicationId(applications[0]?.id ?? '')
     setShowCreateModal(true)
   }
 
+  function openEditModal(toggle: Toggle) {
+    const group = toggles.filter(
+      (item) => item.applicationId === toggle.applicationId && item.key === toggle.key,
+    )
+    const tenantIds = group
+      .map((item) => item.tenantId)
+      .filter((id): id is string => id !== null)
+
+    const allEnabled = group.every((item) => item.isEnabled)
+    const noneEnabled = group.every((item) => !item.isEnabled)
+
+    setEditTarget(toggle)
+    setEditApplicationId(toggle.applicationId)
+    setEditKey(toggle.key)
+    setEditTenantIds(tenantIds)
+    setEditEnabled(toggle.isEnabled)
+    setEditGroupHasMixedStates(!allEnabled && !noneEnabled)
+    setEditError('')
+  }
+
+  async function handleEdit() {
+    if (!editTarget || !editKey.trim()) return
+
+    setIsEditSaving(true)
+    setEditError('')
+    try {
+      await updateToggleGroup({
+        key: editKey.trim(),
+        applicationId: editApplicationId,
+        isEnabled: editEnabled,
+        tenantIds: editTenantIds.length === 0 ? null : editTenantIds,
+      })
+      setEditTarget(null)
+      await loadData()
+    } catch (error) {
+      setEditError((error as Error).message)
+    } finally {
+      setIsEditSaving(false)
+    }
+  }
+
+  function openDeleteModal(toggle: Toggle) {
+    setDeleteTarget(toggle)
+    setDeleteError('')
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setIsDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteToggle(deleteTarget.id)
+      setDeleteTarget(null)
+      await loadData()
+    } catch (error) {
+      setDeleteError((error as Error).message)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   async function handleCreate() {
     if (!canCreate) return
-
-    const tenantIds = newTenants
-      .split(',')
-      .map((x) => x.trim())
-      .filter((x) => x.length > 0)
 
     setIsCreating(true)
     setCreateError('')
@@ -141,7 +245,7 @@ export default function ListTogglesPage() {
         key: newKey.trim(),
         applicationId: newApplicationId,
         isEnabled: newEnabled,
-        tenantIds: tenantIds.length === 0 ? null : tenantIds,
+        tenantIds: newTenantIds.length === 0 ? null : newTenantIds,
       })
       setShowCreateModal(false)
       await loadData()
@@ -154,7 +258,6 @@ export default function ListTogglesPage() {
 
   return (
     <>
-      {/* Page header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">Feature Toggles</h2>
@@ -172,7 +275,6 @@ export default function ListTogglesPage() {
         </button>
       </div>
 
-      {/* Filters bar */}
       <div className="mb-4 flex items-center gap-3">
         <div className="relative">
           <select
@@ -206,7 +308,6 @@ export default function ListTogglesPage() {
         )}
       </div>
 
-      {/* Toggles table */}
       <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] shadow-[var(--card-shadow)]">
         {isLoading ? (
           <div className="px-6 py-12 text-center text-sm text-[var(--text-secondary)]">Loading…</div>
@@ -218,7 +319,7 @@ export default function ListTogglesPage() {
               onClick={openCreateModal}
               className="mt-3 text-sm font-semibold text-[var(--accent)] hover:underline"
             >
-              Create your first toggle →
+              Create your first toggle {'->'}
             </button>
           </div>
         ) : (
@@ -244,7 +345,7 @@ export default function ListTogglesPage() {
                     <td className="px-6 py-3.5">
                       {toggle.tenantId ? (
                         <span className="inline-flex rounded-full border border-[var(--surface-border)] bg-[var(--tenant-chip-bg)] px-2.5 py-1 text-xs font-medium text-[var(--tenant-chip-text)]">
-                          {toggle.tenantId}
+                          {tenantNameById.get(toggle.tenantId) ?? toggle.tenantId}
                         </span>
                       ) : (
                         <span className="inline-flex rounded-full border border-[var(--surface-border)] bg-[var(--global-chip-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--global-chip-text)]">
@@ -270,7 +371,7 @@ export default function ListTogglesPage() {
                           onClick={() => handleToggleStatus(toggle)}
                           className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)]"
                         >
-                          Toggle
+                          {toggle.isEnabled ? 'Disable' : 'Enable'}
                         </button>
                         <button
                           type="button"
@@ -278,6 +379,20 @@ export default function ListTogglesPage() {
                           className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)]"
                         >
                           Evaluate
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(toggle)}
+                          className="rounded-lg border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)]"
+                        >
+                          Edit Group
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDeleteModal(toggle)}
+                          className="rounded-lg border border-[var(--danger-text)]/30 bg-[var(--danger-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--danger-text)] transition hover:brightness-95"
+                        >
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -289,19 +404,18 @@ export default function ListTogglesPage() {
         )}
       </div>
 
-      {/* New Toggle Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setShowCreateModal(false)}
           />
-          <div className="relative w-full max-w-md rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] p-6 shadow-[var(--panel-shadow)]">
+          <div className="relative w-full max-w-lg rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] p-6 shadow-[var(--panel-shadow)]">
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">New Toggle</h3>
                 <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
-                  Create a feature toggle for an application.
+                  Select zero, one or many tenants. No tenant means global.
                 </p>
               </div>
               <button
@@ -350,15 +464,35 @@ export default function ListTogglesPage() {
                 />
               </label>
 
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                Tenant IDs
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
-                  value={newTenants}
-                  onChange={(e) => setNewTenants(e.target.value)}
-                  placeholder="comma-separated UUIDs, empty = global"
-                />
-              </label>
+              <div className="block text-sm font-medium text-[var(--text-secondary)]">
+                Tenants
+                <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">Selected: {newTenantIds.length}</p>
+                <div className="mt-1.5 max-h-40 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] p-2">
+                  {isLoadingTenants ? (
+                    <p className="px-2 py-1 text-xs text-[var(--text-tertiary)]">Loading tenants...</p>
+                  ) : tenants.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-[var(--text-tertiary)]">No tenants registered yet.</p>
+                  ) : (
+                    tenants.map((tenant) => {
+                      const selected = newTenantIds.includes(tenant.id)
+                      return (
+                        <label key={tenant.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 transition hover:bg-[var(--surface-base)]">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => setNewTenantIds((previous) => toggleSelection(previous, tenant.id))}
+                            className="mt-0.5 h-4 w-4 rounded border-[var(--surface-border)] accent-[var(--accent)]"
+                          />
+                          <span className="flex-1">
+                            <span className="block text-sm font-semibold text-[var(--text-primary)]">{tenant.name}</span>
+                            <span className="font-mono text-[11px] text-[var(--text-tertiary)]">{tenant.id}</span>
+                          </span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
 
               <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm font-medium text-[var(--text-secondary)]">
                 <input
@@ -389,6 +523,125 @@ export default function ListTogglesPage() {
                   {isCreating ? 'Creating…' : 'Create'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditTarget(null)} />
+          <div className="relative w-full max-w-lg rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] p-6 shadow-[var(--panel-shadow)]">
+            <div className="mb-5 flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Edit Toggle Group</h3>
+                <p className="mt-0.5 text-sm text-[var(--text-secondary)]">Update application, key, enabled flag and tenant set.</p>
+              </div>
+              <button type="button" onClick={() => setEditTarget(null)} className="rounded-lg p-1 text-[var(--text-tertiary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]">
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                Application <span className="text-[var(--danger-text)]">*</span>
+                <div className="relative mt-1.5">
+                  <select
+                    className="w-full appearance-none rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] py-2.5 pl-3 pr-8 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+                    value={editApplicationId}
+                    onChange={(e) => setEditApplicationId(e.target.value)}
+                  >
+                    {applications.map((app) => (
+                      <option key={app.id} value={app.id}>{app.name}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[var(--text-tertiary)]">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              </label>
+
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                Key <span className="text-[var(--danger-text)]">*</span>
+                <input
+                  autoFocus
+                  className="mt-1.5 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+                  value={editKey}
+                  onChange={(e) => setEditKey(e.target.value)}
+                />
+              </label>
+
+              <div className="block text-sm font-medium text-[var(--text-secondary)]">
+                Tenants
+                <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">Selected: {editTenantIds.length}. Empty = global.</p>
+                <div className="mt-1.5 max-h-40 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--surface-muted)] p-2">
+                  {isLoadingTenants ? (
+                    <p className="px-2 py-1 text-xs text-[var(--text-tertiary)]">Loading tenants...</p>
+                  ) : tenants.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-[var(--text-tertiary)]">No tenants registered yet.</p>
+                  ) : (
+                    tenants.map((tenant) => {
+                      const selected = editTenantIds.includes(tenant.id)
+                      return (
+                        <label key={tenant.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 transition hover:bg-[var(--surface-base)]">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => setEditTenantIds((previous) => toggleSelection(previous, tenant.id))}
+                            className="mt-0.5 h-4 w-4 rounded border-[var(--surface-border)] accent-[var(--accent)]"
+                          />
+                          <span className="flex-1">
+                            <span className="block text-sm font-semibold text-[var(--text-primary)]">{tenant.name}</span>
+                            <span className="font-mono text-[11px] text-[var(--text-tertiary)]">{tenant.id}</span>
+                          </span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm font-medium text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={editEnabled}
+                  onChange={(e) => setEditEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--surface-border)] accent-[var(--accent)]"
+                />
+                Enabled for all selected targets
+              </label>
+
+              {editGroupHasMixedStates && (
+                <p className="text-xs text-[var(--text-secondary)]">
+                  This group currently has mixed enabled states. Saving here applies one state to the entire group.
+                </p>
+              )}
+              {editError && <p className="text-xs text-[var(--danger-text)]">{editError}</p>}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setEditTarget(null)} className="rounded-lg border border-[var(--surface-border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)]">Cancel</button>
+                <button type="button" onClick={handleEdit} disabled={isEditSaving || !editKey.trim()} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-contrast)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                  {isEditSaving ? 'Saving…' : 'Save Group'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
+          <div className="relative w-full max-w-sm rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-base)] p-6 shadow-[var(--panel-shadow)]">
+            <h3 className="text-base font-bold text-[var(--text-primary)]">Delete Toggle</h3>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              Are you sure you want to delete toggle <span className="font-mono font-semibold text-[var(--text-primary)]">{deleteTarget.key}</span>? This action cannot be undone.
+            </p>
+            {deleteError && <p className="mt-3 text-xs text-[var(--danger-text)]">{deleteError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg border border-[var(--surface-border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)]">Cancel</button>
+              <button type="button" onClick={handleDelete} disabled={isDeleting} className="rounded-lg bg-[var(--danger-text)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50">
+                {isDeleting ? 'Deleting…' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>

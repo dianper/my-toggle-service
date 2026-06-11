@@ -14,6 +14,11 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
+      '/auth': {
+        target: apiTarget,
+        // Keep original host so backend can generate callback URLs for the public origin.
+        changeOrigin: false,
+      },
       '/api': {
         target: apiTarget,
         changeOrigin: true,

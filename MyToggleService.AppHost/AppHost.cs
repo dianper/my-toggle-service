@@ -2,6 +2,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder
     .AddPostgres("postgres")
+    .WithDataVolume()
     .WithPgAdmin();
 
 var togglesDb = postgres.AddDatabase("togglesdb");
